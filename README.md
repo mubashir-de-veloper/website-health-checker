@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Website Health Checker
 
-## Getting Started
+A free automated website health checker built with Next.js. It analyzes a website's SEO, technical, and content health and generates a simple score with actionable recommendations.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Analyze any public HTTP/HTTPS website
+- SEO checks:
+  - Page title
+  - Meta description
+  - Canonical URL
+  - Open Graph tags
+- Technical checks:
+  - HTTPS
+  - Mobile viewport
+  - HTML language
+  - Image alt text
+- Content checks:
+  - H1 heading
+  - Heading structure
+  - Basic content length
+- Overall and category scores
+- Rule-based recommendations
+- Responsive interface
+- URL validation and basic SSRF protection
+- No database, AI API, or paid service required
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Tech Stack
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+- Next.js
+- React
+- TypeScript
+- Tailwind CSS
+- Cheerio
+- Vercel
+- GitHub
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project Structure
 
-## Learn More
+app/
+├── api/
+│   └── analyze/
+│       └── route.ts
+├── layout.tsx
+└── page.tsx
 
-To learn more about Next.js, take a look at the following resources:
+lib/
+├── checks.ts
+├── recommendations.ts
+├── scoring.ts
+└── types.ts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Architecture
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+        ```text
+            User enters URL
+                ↓
+            Next.js Frontend
+                ↓
+            POST /api/analyze
+                ↓
+            URL validation & security checks
+                ↓
+            Fetch website HTML
+                ↓
+            Cheerio HTML parsing
+                ↓
+            AnalysisResult
+                ↓
+            runChecks()
+                ↓
+┌───────────────┬───────────────┐
+│               │               │
+Scores     Recommendations    Report
+│               │               │
+└───────────────┴───────────────┘
+                ↓
+            React UI
 
-## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
