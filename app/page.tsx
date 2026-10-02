@@ -390,7 +390,9 @@ export default function Home() {
             </p>
 
             <a
-              href="mailto:khawajaalabs@gmail.com"
+              href="https://mail.google.com/mail/?view=cm&fs=1&to=khawajaalabs@gmail.com"
+              target="_blank"
+              rel="noopener noreferrer"
               className="mt-6 inline-block rounded-xl bg-white px-6 py-3 font-semibold text-slate-900 transition hover:bg-slate-100"
             >
               Talk to Khawaja Labs →
