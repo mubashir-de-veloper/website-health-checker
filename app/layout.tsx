@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Website Health Checker",
   description: "Free automated website health checker for SEO, technical and content issues.",
+  verification: {
+    google: "un5GqamqyuYBPcB6nC84dJLpfadK9kztWiCPAobfDyA",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
