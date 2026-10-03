@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { signIn } from "next-auth/react";
 
 interface Check {
   id: string;
@@ -65,12 +66,111 @@ interface AnalysisResponse {
   recommendations: Recommendation[];
 }
 
+interface SearchConsoleResponse {
+  success: boolean;
+  siteUrl?: string;
+  dateRange?: {
+    startDate: string;
+    endDate: string;
+  };
+  performance?: {
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  };
+  topQueries?: {
+    query: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }[];
+  topPages?: {
+    page: string;
+    clicks: number;
+    impressions: number;
+    ctr: number;
+    position: number;
+  }[];
+  error?: string;
+}
+
+interface SearchConsoleSite {
+  siteUrl: string;
+  permissionLevel: string;
+}
+
+interface SearchConsoleSitesResponse {
+  success: boolean;
+  sites?: SearchConsoleSite[];
+  error?: string;
+}
+
 export default function Home() {
+//  const { data: session, status: sessionStatus } = useSession();
+  const [searchConsoleDays, setSearchConsoleDays] = useState("28");
   const [url, setUrl] = useState("");
   const [report, setReport] = useState<AnalysisResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [searchConsole, setSearchConsole] =
+  useState<SearchConsoleResponse | null>(null);
+
+  const [searchConsoleLoading, setSearchConsoleLoading] =
+    useState(false);
+
+  const [searchConsoleError, setSearchConsoleError] =
+    useState("");
+
+  const [searchConsoleSites, setSearchConsoleSites] =
+    useState<SearchConsoleSite[]>([]);
+  
+  const [selectedSearchConsoleSite, setSelectedSearchConsoleSite] =
+    useState("");
+  
+  const [searchConsoleSitesLoading, setSearchConsoleSitesLoading] =
+    useState(false);
+
+    async function loadSearchConsoleSites() {
+      setSearchConsoleSitesLoading(true);
+      setSearchConsoleError("");
+    
+      try {
+        const response = await fetch("/api/search-console");
+        const data: SearchConsoleSitesResponse =
+          await response.json();
+    
+        if (!response.ok || !data.success) {
+          throw new Error(
+            data.error ||
+              "Unable to retrieve Search Console properties."
+          );
+        }
+    
+        const sites = data.sites ?? [];
+    
+        setSearchConsoleSites(sites);
+    
+        const ownerSite = sites.find(
+          (site) => site.permissionLevel === "siteOwner"
+        );
+    
+        if (ownerSite) {
+          setSelectedSearchConsoleSite(ownerSite.siteUrl);
+        }
+      } catch (err) {
+        setSearchConsoleError(
+          err instanceof Error
+            ? err.message
+            : "Unable to retrieve Search Console properties."
+        );
+      } finally {
+        setSearchConsoleSitesLoading(false);
+      }
+    }
+  
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -116,6 +216,44 @@ export default function Home() {
       }
 
       setReport(data);
+
+      if (!selectedSearchConsoleSite) {
+        setSearchConsole(null);
+        setSearchConsoleError(
+          "Select a Google Search Console property first."
+        );
+        return;
+      }
+
+      setSearchConsole(null);
+      setSearchConsoleError("");
+      setSearchConsoleLoading(true);
+
+      try {
+        const searchConsoleResponse = await fetch(
+          `/api/search-console?siteUrl=${encodeURIComponent(
+            selectedSearchConsoleSite
+          )}&days=${searchConsoleDays}`
+        );
+
+        const searchConsoleData =
+          await searchConsoleResponse.json();
+
+        if (!searchConsoleResponse.ok) {
+          setSearchConsoleError(
+            searchConsoleData.error ||
+              "Unable to retrieve Google Search Console data."
+          );
+        } else {
+          setSearchConsole(searchConsoleData);
+        }
+      } catch {
+        setSearchConsoleError(
+          "Unable to connect to Google Search Console."
+        );
+      } finally {
+        setSearchConsoleLoading(false);
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -172,6 +310,7 @@ export default function Home() {
               health with an automated report.
             </p>
 
+
             <form
               onSubmit={handleSubmit}
               className="mx-auto mt-8 flex max-w-3xl flex-col gap-3 sm:flex-row"
@@ -193,6 +332,85 @@ export default function Home() {
                 {loading ? "Analyzing..." : "Analyze Website"}
               </button>
             </form>
+
+            <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm">
+              <label
+                htmlFor="search-console-days"
+                className="text-sm font-semibold text-slate-700"
+              >
+                Search Console Date Range
+              </label>
+
+              <select
+                id="search-console-days"
+                value={searchConsoleDays}
+                onChange={(event) =>
+                  setSearchConsoleDays(event.target.value)
+                }
+                className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700"
+              >
+                <option value="7">Last 7 days</option>
+                <option value="28">Last 28 days</option>
+                <option value="90">Last 90 days</option>
+              </select>
+            </div>
+
+            <div className="mx-auto mt-6 max-w-xl">
+              <button
+                type="button"
+                onClick={() => signIn("google")}
+                className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              >
+                Connect Google Search Console
+              </button>
+
+              <button
+                type="button"
+                onClick={loadSearchConsoleSites}
+                disabled={searchConsoleSitesLoading}
+                className="ml-3 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {searchConsoleSitesLoading
+                  ? "Loading Search Console..."
+                  : "Load Search Console Properties"}
+              </button>
+
+              {searchConsoleSites.length > 0 && (
+                <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 text-left shadow-sm">
+                  <label
+                    htmlFor="search-console-site"
+                    className="text-sm font-semibold text-slate-700"
+                  >
+                    Search Console Property
+                  </label>
+
+                  <select
+                    id="search-console-site"
+                    value={selectedSearchConsoleSite}
+                    onChange={(event) =>
+                      setSelectedSearchConsoleSite(event.target.value)
+                    }
+                    className="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700"
+                  >
+                    <option value="">
+                      Select a Search Console property
+                    </option>
+
+                    {searchConsoleSites.map((site) => (
+                      <option key={site.siteUrl} value={site.siteUrl}>
+                        {site.siteUrl} — {site.permissionLevel}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {searchConsoleError && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-left text-sm text-amber-700">
+                  {searchConsoleError}
+                </div>
+              )}
+            </div>
 
             {loading && (
               <p className="mt-4 text-sm text-slate-500">
@@ -306,6 +524,179 @@ export default function Home() {
                 getStatusClass={getStatusClass}
               />
             </div>
+          </div>
+
+          {/* Google Search Performance */}
+          <div className="mt-10">
+            <div className="mb-5">
+              <h2 className="text-2xl font-bold">
+                Google Search Performance
+              </h2>
+
+              <p className="mt-1 text-sm text-slate-500">
+                Search performance data from Google Search Console.
+              </p>
+            </div>
+
+            {searchConsoleLoading ? (
+              <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-sm">
+                <p className="text-sm text-slate-500">
+                  Loading Google Search Console data...
+                </p>
+              </div>
+            ) : searchConsoleError ? (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center">
+                <p className="font-semibold text-amber-800">
+                  Google Search Console data unavailable
+                </p>
+
+                <p className="mt-1 text-sm text-amber-700">
+                  {searchConsoleError}
+                </p>
+              </div>
+            ) : searchConsole ? (
+              <>
+                {/* Performance overview */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                  <SearchConsoleMetric
+                    label="Clicks"
+                    value={searchConsole.performance?.clicks ?? 0}
+                    description="Google search clicks"
+                  />
+
+                  <SearchConsoleMetric
+                    label="Impressions"
+                    value={searchConsole.performance?.impressions ?? 0}
+                    description="Search appearances"
+                  />
+
+                  <SearchConsoleMetric
+                    label="CTR"
+                    value={`${(
+                      (searchConsole.performance?.ctr ?? 0) * 100
+                    ).toFixed(2)}%`}
+                    description="Average click-through rate"
+                  />
+
+                  <SearchConsoleMetric
+                    label="Average Position"
+                    value={
+                      searchConsole.performance?.position
+                        ? searchConsole.performance.position.toFixed(1)
+                        : "No data"
+                    }
+                    description="Average search position"
+                  />
+                </div>
+
+                {/* Date range */}
+                {searchConsole.dateRange && (
+                  <p className="mt-4 text-xs text-slate-500">
+                    Data from {searchConsole.dateRange.startDate} to{" "}
+                    {searchConsole.dateRange.endDate}
+                  </p>
+                )}
+
+                {/* Top queries and pages */}
+                <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                  {/* Top queries */}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <h3 className="text-lg font-bold">
+                      Top Search Queries
+                    </h3>
+
+                    {searchConsole.topQueries &&
+                    searchConsole.topQueries.length > 0 ? (
+                      <div className="mt-5 space-y-3">
+                        {searchConsole.topQueries.map((item) => (
+                          <div
+                            key={item.query}
+                            className="rounded-xl border border-slate-100 p-4"
+                          >
+                            <p className="break-words text-sm font-semibold text-slate-900">
+                              {item.query}
+                            </p>
+
+                            <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                              <span>
+                                Clicks: {item.clicks}
+                              </span>
+
+                              <span>
+                                Impressions: {item.impressions}
+                              </span>
+
+                              <span>
+                                Position: {item.position.toFixed(1)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-5 rounded-xl bg-slate-50 p-5 text-center">
+                        <p className="text-sm font-medium text-slate-700">
+                          No search query data yet.
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Search Console has not recorded search
+                          performance data for this site yet.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Top pages */}
+                  <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+                    <h3 className="text-lg font-bold">
+                      Top Pages
+                    </h3>
+
+                    {searchConsole.topPages &&
+                    searchConsole.topPages.length > 0 ? (
+                      <div className="mt-5 space-y-3">
+                        {searchConsole.topPages.map((item) => (
+                          <div
+                            key={item.page}
+                            className="rounded-xl border border-slate-100 p-4"
+                          >
+                            <p className="break-all text-sm font-semibold text-slate-900">
+                              {item.page}
+                            </p>
+
+                            <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                              <span>
+                                Clicks: {item.clicks}
+                              </span>
+
+                              <span>
+                                Impressions: {item.impressions}
+                              </span>
+
+                              <span>
+                                Position: {item.position.toFixed(1)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-5 rounded-xl bg-slate-50 p-5 text-center">
+                        <p className="text-sm font-medium text-slate-700">
+                          No page data yet.
+                        </p>
+
+                        <p className="mt-1 text-xs text-slate-500">
+                          Search Console has not recorded search
+                          performance data for this site yet.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : null}
           </div>
 
           {/* Recommendations */}
@@ -488,6 +879,32 @@ function CheckSection({
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function SearchConsoleMetric({
+  label,
+  value,
+  description,
+}: {
+  label: string;
+  value: string | number;
+  description: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+      <p className="text-sm font-semibold text-slate-600">
+        {label}
+      </p>
+
+      <p className="mt-3 text-3xl font-bold text-slate-900">
+        {value}
+      </p>
+
+      <p className="mt-2 text-xs text-slate-500">
+        {description}
+      </p>
     </div>
   );
 }
